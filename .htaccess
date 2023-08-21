@@ -1,0 +1,3 @@
+RewriteEngine On
+DirectoryIndex src/core/Engine.php 
+RewriteRule ^.*$ src/core/Engine.php
