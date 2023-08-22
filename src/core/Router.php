@@ -16,7 +16,8 @@ class Router {
         $request_method = $_SERVER['REQUEST_METHOD'];
 
         $url[0] = str_starts_with($url[0], "/") ? '/' : '/'.$url[0];
-        $requested_route = $this->getRoute($url[0], $request_method);
+        $requested_route = $this->getRoute($url, $request_method);
+
         if($requested_route) {
             call_user_func($requested_route);
             return;
@@ -25,7 +26,6 @@ class Router {
         $this->handleNotFound();
         
     }
-
 
     function handleNotFound() {
         print_r("Not Found.");
@@ -57,26 +57,62 @@ class Router {
     }
 
     public function post($path, $callback) {
-        $this->addRoute('POST', $path, $callback);
+        $function_reflection = new ReflectionFunction($callback);
+        $param_num = $function_reflection->getNumberOfRequiredParameters();
+
+        if($param_num === 0) {
+            $this->addRoute('POST', $path, $callback);
+        } elseif($param_num === 1) {
+            
+            $this->addRoute('POST', $path, function() use ($callback){
+                $headers = getallheaders();
+                $post_data = [];
+                if (isset($headers['Content-Type']) && strpos($headers['Content-Type'], 'application/json') !== false) {
+                    $rawData = file_get_contents('php://input');
+                    $post_data = json_decode($rawData, true) ?? []; 
+                } else {
+                    $post_data = $_POST;
+                }
+
+                $request_data = [
+                    'params' => $_GET,
+                    'body' => $post_data,
+                    'headers' => $headers
+                ];
+
+    
+                return $callback($request_data);
+            });
+        }
     }
 
     public function addRoute($method, $path, $callback) {
         $this->routes[$method][$path] = $callback;
     }
 
-    public function use($prefix, $router) {
-        foreach ($router->getRoutes('GET') as $route => $callback) {
-            $this->get($prefix . $route, $callback);
+    public function use($routePath, $router) {
+        $routes = $router->getAllRoutes();
+
+        foreach ($routes as $method => $route) {
+
+            foreach($route as $path => $callbackFunction) {
+                if($path === "/") {
+                    $this->addRoute($method, $routePath, $callbackFunction);
+                    continue;
+                }
+                $this->addRoute($method, $routePath.$path, $callbackFunction);
+            }
         }
-        
-        foreach ($router->getRoutes('POST') as $route => $callback) {
-            $this->post($prefix . $route, $callback);
-        }
-        
-        // ... Similarly for other HTTP methods ...
+    }
+
+    public function getAllRoutes() {
+        return $this->routes;
     }
 
     public function getRoute($url, $method) {
+
+        $url = implode('/', $url);
+
         if (isset($this->routes[$method][$url]) && 
             $requested_route = $this->routes[$method][$url]) {
             return $requested_route;
@@ -84,12 +120,6 @@ class Router {
 
         return false;
     }
-
-    // public function use($prefix, $router) {
-    //     foreach ($router->routes as $key => $value) {
-    //         $this->routes[$prefix . $key] = $value;
-    //     }
-    // }
 
     protected function fitlerUrl($url) {
 

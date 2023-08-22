@@ -4,7 +4,6 @@
     require_once "../config/App.php";
     
     // Load Core Files
-    require_once "RequestMethod.php";
     require_once "Router.php";
 
     // Load Helpers
