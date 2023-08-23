@@ -6,7 +6,7 @@
     define('DB_HOST', 'localhost');
     define('DB_USERNAME', 'root');
     define('DB_PASSWORD', '');
-    define('DB_NAME', 'pooljunction');
+    define('DB_NAME', 'ak-robotics');
 
     // Main Entry Point file
     $MainEntryPointFile = 'main.php';
@@ -25,7 +25,7 @@
     define("appRootDirectoryName", $appRootDirectoryName);
 
     // Site Name
-    $siteName = "Pool Junction";
+    $siteName = "ak-robotics";
     define("SITENAME", $siteName);
 
     // App Version
