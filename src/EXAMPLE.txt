@@ -1,8 +1,7 @@
 <?php
 
 $router->get('/', function($req) {
-    setcookie('cookie_name', 'cookie_value', time() + 3600, '/', '', false, true);
-    echo "hi";
+    print_r("Hello from index");
 }, ['authenticated']);
 
 $router->post('/', function($req) {
@@ -13,18 +12,12 @@ $router->put('/', function($req) {
     print_r(json_encode($req));
 }, ['authenticated']);
 
-$router->delete('/', function($req) {
-    print_r(json_encode($req));
-}, ['authenticated']);
-
-$router->patch('/', function($req) {
-    print_r(json_encode($req));
-}, ['authenticated']);
-
-
 $router->middleware('authenticated', function($req) {
-    return true;
+    print_r(json_encode($req));
+    return false;
 });
 
 $router->get('/admin', function($req) {
 });
+
+?>

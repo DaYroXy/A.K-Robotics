@@ -8,6 +8,7 @@
 
 class Router {
 
+    private $middlewares = [];
     private $routes = [];
 
     // Dispatch the route, creating the controller object and running the action method
@@ -19,12 +20,63 @@ class Router {
         $requested_route = $this->getRoute($url, $request_method);
 
         if($requested_route) {
-            call_user_func($requested_route);
+            $middlewares = $requested_route['middlewares'];
+            $headers = getallheaders();
+            $post_data = [];
+
+            if (isset($headers['Content-Type']) && strpos($headers['Content-Type'], 'application/json') !== false) {
+                $rawData = file_get_contents('php://input');
+                $post_data = json_decode($rawData, true) ?? []; 
+            } else {
+                $post_data = $_POST;
+            }
+
+            $request_data = [
+                'params' => $_GET,
+                'body' => $post_data,
+                'headers' => $headers
+            ];
+
+            // print_r($requested_route['middlewares']);
+            if(count($middlewares) > 0) {
+                
+                foreach($middlewares as $middleware) {
+                    $middleware = $this->middlewares[$middleware];
+                    $function_reflection = new ReflectionFunction($middleware);
+                    $param_num = $function_reflection->getNumberOfRequiredParameters();
+
+                    if($param_num > 0) {
+                        $middleware_response = call_user_func($middleware, $request_data);
+                        if ( $middleware_response === null || $middleware_response === false) {
+                            return;
+                        }
+                        continue;
+                    }
+                    $middleware_response = call_user_func($middleware);
+                    if ( $middleware_response === null || $middleware_response === false ) {
+                        return;
+                    }
+                }
+
+            }
+            
+            $requested_callback = $requested_route['callback'];
+            $function_reflection = new ReflectionFunction($requested_callback);
+            $param_num = $function_reflection->getNumberOfRequiredParameters();
+
+            if($param_num > 0) {
+                call_user_func($requested_callback, $request_data);
+                return;
+            }
+            call_user_func($requested_callback);
             return;
         }
 
-        $this->handleNotFound();
-        
+        $this->handleNotFound();   
+    }
+
+    function middleware($name, $callback) {
+        $this->middlewares[$name] = $callback;
     }
 
     function handleNotFound() {
@@ -38,56 +90,32 @@ class Router {
      * Here goes all the requests methods
      * 
     */
-    public function get($path, $callback) {
-        $function_reflection = new ReflectionFunction($callback);
-        $param_num = $function_reflection->getNumberOfRequiredParameters();
-
-        if($param_num === 0) {
-            $this->addRoute('GET', $path, $callback);
-        } elseif($param_num === 1) {
-            $this->addRoute('GET', $path, function() use ($callback){
-                $request_data = [
-                    'params' => $_GET,
-                    'headers' => getallheaders()
-                ];
-    
-                return $callback($request_data);
-            });
-        }
+    public function get($path, $callback, $middlewares = []) {
+        $this->addRoute('GET', $path, $callback, $middlewares);
     }
 
-    public function post($path, $callback) {
-        $function_reflection = new ReflectionFunction($callback);
-        $param_num = $function_reflection->getNumberOfRequiredParameters();
-
-        if($param_num === 0) {
-            $this->addRoute('POST', $path, $callback);
-        } elseif($param_num === 1) {
-            
-            $this->addRoute('POST', $path, function() use ($callback){
-                $headers = getallheaders();
-                $post_data = [];
-                if (isset($headers['Content-Type']) && strpos($headers['Content-Type'], 'application/json') !== false) {
-                    $rawData = file_get_contents('php://input');
-                    $post_data = json_decode($rawData, true) ?? []; 
-                } else {
-                    $post_data = $_POST;
-                }
-
-                $request_data = [
-                    'params' => $_GET,
-                    'body' => $post_data,
-                    'headers' => $headers
-                ];
-
-    
-                return $callback($request_data);
-            });
-        }
+    public function post($path, $callback, $middlewares = []) {
+        $this->addRoute('POST', $path, $callback, $middlewares);
     }
 
-    public function addRoute($method, $path, $callback) {
-        $this->routes[$method][$path] = $callback;
+    public function put($path, $callback, $middlewares = []) {
+        $this->addRoute('PUT', $path, $callback, $middlewares);
+    }
+
+    public function patch($path, $callback, $middlewares = []) {
+        $this->addRoute('PATCH', $path, $callback, $middlewares);
+    }
+
+    public function delete($path, $callback, $middlewares = []) {
+        $this->addRoute('DELETE', $path, $callback, $middlewares);
+    }
+
+
+    public function addRoute($method, $path, $callback, $middlewares = []) {
+        $this->routes[$method][$path] = [
+            'callback' => $callback,
+            'middlewares' => $middlewares
+        ];
     }
 
     public function use($routePath, $router) {
